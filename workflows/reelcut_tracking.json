@@ -1,0 +1,253 @@
+{
+  "version": "1.0",
+  "inputs": [
+    {
+      "type": "WorkflowImage",
+      "name": "image"
+    },
+    {
+      "type": "WorkflowParameter",
+      "name": "model_id",
+      "default_value": "ia-foot-8ecu7/1"
+    },
+    {
+      "type": "WorkflowParameter",
+      "name": "detection_confidence",
+      "default_value": 0.1
+    },
+    {
+      "type": "WorkflowParameter",
+      "name": "enable_cmc",
+      "default_value": false
+    }
+  ],
+  "steps": [
+    {
+      "type": "roboflow_core/roboflow_object_detection_model@v2",
+      "name": "detector",
+      "images": "$inputs.image",
+      "model_id": "$inputs.model_id",
+      "confidence": "$inputs.detection_confidence",
+      "iou_threshold": 0.5,
+      "max_detections": 100
+    },
+    {
+      "type": "roboflow_core/per_class_confidence_filter@v1",
+      "name": "class_thresholds",
+      "predictions": "$steps.detector.predictions",
+      "class_thresholds": {
+        "player": 0.4,
+        "Player": 0.4,
+        "goalkeeper": 0.4,
+        "Goalkeeper": 0.4,
+        "goalie": 0.4,
+        "referee": 0.4,
+        "Referee": 0.4,
+        "ref": 0.4,
+        "ball": 0.4,
+        "Ball": 0.4,
+        "goal": 0.15,
+        "Goal": 0.15
+      },
+      "default_threshold": 0.4
+    },
+    {
+      "type": "roboflow_core/detections_filter@v1",
+      "name": "people",
+      "predictions": "$steps.class_thresholds.predictions",
+      "operations": [
+        {
+          "type": "DetectionsFilter",
+          "filter_operation": {
+            "type": "StatementGroup",
+            "operator": "and",
+            "statements": [
+              {
+                "type": "BinaryStatement",
+                "left_operand": {
+                  "type": "DynamicOperand",
+                  "operand_name": "_",
+                  "operations": [
+                    {
+                      "type": "ExtractDetectionProperty",
+                      "property_name": "class_name"
+                    }
+                  ]
+                },
+                "comparator": {
+                  "type": "in (Sequence)"
+                },
+                "right_operand": {
+                  "type": "StaticOperand",
+                  "value": [
+                    "player",
+                    "Player",
+                    "goalkeeper",
+                    "Goalkeeper",
+                    "goalie",
+                    "referee",
+                    "Referee",
+                    "ref"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "operations_parameters": {}
+    },
+    {
+      "type": "roboflow_core/detections_filter@v1",
+      "name": "ball",
+      "predictions": "$steps.class_thresholds.predictions",
+      "operations": [
+        {
+          "type": "DetectionsFilter",
+          "filter_operation": {
+            "type": "StatementGroup",
+            "operator": "and",
+            "statements": [
+              {
+                "type": "BinaryStatement",
+                "left_operand": {
+                  "type": "DynamicOperand",
+                  "operand_name": "_",
+                  "operations": [
+                    {
+                      "type": "ExtractDetectionProperty",
+                      "property_name": "class_name"
+                    }
+                  ]
+                },
+                "comparator": {
+                  "type": "in (Sequence)"
+                },
+                "right_operand": {
+                  "type": "StaticOperand",
+                  "value": [
+                    "ball",
+                    "Ball"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "SortDetections",
+          "mode": "confidence",
+          "ascending": false
+        },
+        {
+          "type": "DetectionsSelection",
+          "mode": "first"
+        }
+      ],
+      "operations_parameters": {}
+    },
+    {
+      "type": "roboflow_core/detections_filter@v1",
+      "name": "goals",
+      "predictions": "$steps.class_thresholds.predictions",
+      "operations": [
+        {
+          "type": "DetectionsFilter",
+          "filter_operation": {
+            "type": "StatementGroup",
+            "operator": "and",
+            "statements": [
+              {
+                "type": "BinaryStatement",
+                "left_operand": {
+                  "type": "DynamicOperand",
+                  "operand_name": "_",
+                  "operations": [
+                    {
+                      "type": "ExtractDetectionProperty",
+                      "property_name": "class_name"
+                    }
+                  ]
+                },
+                "comparator": {
+                  "type": "in (Sequence)"
+                },
+                "right_operand": {
+                  "type": "StaticOperand",
+                  "value": [
+                    "goal",
+                    "Goal"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "operations_parameters": {}
+    },
+    {
+      "type": "roboflow_core/trackers_botsort@v1",
+      "name": "tracker",
+      "image": "$inputs.image",
+      "detections": "$steps.people.predictions",
+      "enable_cmc": "$inputs.enable_cmc",
+      "cmc_method": "sparseOptFlow",
+      "track_activation_threshold": 0.5,
+      "high_conf_det_threshold": 0.5,
+      "minimum_consecutive_frames": 2,
+      "lost_track_buffer": 30,
+      "instant_first_frame_activation": true
+    },
+    {
+      "type": "roboflow_core/track_class_lock@v1",
+      "name": "class_lock",
+      "image": "$inputs.image",
+      "detections": "$steps.tracker.tracked_detections",
+      "min_votes": 6,
+      "vote_confidence": 0.5,
+      "lead_margin": 2,
+      "switch_after": 15,
+      "reattach_window": 25,
+      "reattach_iou": 0.3
+    },
+    {
+      "type": "roboflow_core/stabilize_detections@v1",
+      "name": "stabilizer",
+      "image": "$inputs.image",
+      "detections": "$steps.class_lock.tracked_detections",
+      "smoothing_window_size": 3,
+      "bbox_smoothing_coefficient": 0.25
+    },
+    {
+      "type": "roboflow_core/velocity@v1",
+      "name": "velocity",
+      "image": "$inputs.image",
+      "detections": "$steps.stabilizer.tracked_detections",
+      "smoothing_alpha": 0.5,
+      "pixels_per_meter": 1.0
+    }
+  ],
+  "outputs": [
+    {
+      "type": "JsonField",
+      "name": "tracked_players",
+      "selector": "$steps.velocity.velocity_detections"
+    },
+    {
+      "type": "JsonField",
+      "name": "ball",
+      "selector": "$steps.ball.predictions"
+    },
+    {
+      "type": "JsonField",
+      "name": "goal_detections",
+      "selector": "$steps.goals.predictions"
+    },
+    {
+      "type": "JsonField",
+      "name": "raw_detections",
+      "selector": "$steps.detector.predictions"
+    }
+  ]
+}
