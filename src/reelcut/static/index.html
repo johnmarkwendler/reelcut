@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reelcut — every game, their highlights</title>
+<style>
+  :root {
+    --violet: #7C3AED; --violet-hot: #9F67FF; --lime: #C8FF3D;
+    --bg: #08080d; --bg2: #0d0d15; --card: #12121c;
+    --edge2: #262636; --text: #f2f2f7; --dim: #8b8b9e;
+    --glow: 0 0 24px rgba(124, 58, 237, .45), 0 0 80px rgba(124, 58, 237, .15);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; font-family: -apple-system, "SF Pro Display", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden;
+  }
+  /* drifting arena-light backdrop */
+  body::before {
+    content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(600px 400px at 15% 10%, rgba(124,58,237,.16), transparent 60%),
+      radial-gradient(700px 500px at 85% 30%, rgba(200,255,61,.05), transparent 60%),
+      radial-gradient(800px 600px at 50% 95%, rgba(124,58,237,.10), transparent 60%);
+    animation: drift 24s ease-in-out infinite alternate;
+  }
+  @keyframes drift { to { transform: translate(3%, -2%) scale(1.05); } }
+
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 40px 20px 120px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  .logo {
+    font-size: 42px; font-weight: 800; letter-spacing: -1.5px;
+    background: linear-gradient(92deg, #fff 20%, var(--violet-hot) 60%, var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tag { color: var(--dim); font-size: 15px; }
+  .sub { color: var(--dim); margin: 0 0 34px; font-size: 15px; }
+  .sub b { color: var(--lime); font-weight: 600; }
+
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--bg2));
+    border: 1px solid var(--edge2); border-radius: 18px;
+    padding: 26px; margin-bottom: 22px;
+    opacity: .35; transform: translateY(6px); transition: all .5s ease;
+    pointer-events: none; filter: saturate(.4);
+  }
+  .card.active { opacity: 1; transform: none; pointer-events: auto; filter: none; }
+  .card.done .step-chip { background: var(--lime); color: #111; box-shadow: 0 0 16px rgba(200,255,61,.4); }
+  .card h2 { font-size: 17px; margin: 0 0 16px; display: flex; align-items: center; letter-spacing: .2px; }
+  .step-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--violet); color: #fff; border-radius: 8px;
+    min-width: 26px; height: 26px; font-size: 13px; font-weight: 700;
+    margin-right: 12px; box-shadow: var(--glow);
+  }
+
+  /* dropzone */
+  #drop {
+    border: 2px dashed rgba(124,58,237,.55); border-radius: 16px;
+    padding: 46px 20px; text-align: center; cursor: pointer;
+    transition: all .25s ease; background: rgba(124,58,237,.04);
+  }
+  #drop:hover, #drop.over {
+    border-color: var(--violet-hot); background: rgba(124,58,237,.12);
+    box-shadow: inset 0 0 60px rgba(124,58,237,.12), var(--glow);
+  }
+  #drop .ball { font-size: 44px; display: block; margin-bottom: 10px; filter: drop-shadow(0 0 12px rgba(200,255,61,.5)); }
+  #drop .big { font-size: 19px; font-weight: 700; letter-spacing: .3px; }
+  #drop .small { color: var(--dim); font-size: 13px; margin-top: 6px; }
+  #file { display: none; }
+
+  .bar { height: 6px; border-radius: 3px; background: var(--edge2); margin-top: 18px; overflow: hidden; display: none; }
+  .bar i { display: block; height: 100%; width: 0%; border-radius: 3px;
+           background: linear-gradient(90deg, var(--violet), var(--violet-hot), var(--lime));
+           transition: width .2s; }
+
+  video { width: 100%; border-radius: 14px; background: #000; display: block; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+  .hint { color: var(--dim); font-size: 13.5px; margin-top: 10px; line-height: 1.5; }
+
+  button {
+    background: linear-gradient(135deg, var(--violet), #6428d6); color: #fff;
+    border: 0; border-radius: 10px; padding: 12px 20px; font-size: 14.5px;
+    font-weight: 700; letter-spacing: .3px; cursor: pointer;
+    transition: all .2s ease; box-shadow: 0 2px 14px rgba(124,58,237,.35);
+  }
+  button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--glow); }
+  button:disabled { opacity: .35; cursor: default; box-shadow: none; }
+  button.mega { font-size: 16px; padding: 14px 26px; }
+
+  input, select {
+    background: #0c0c14; color: var(--text); border: 1px solid var(--edge2);
+    border-radius: 10px; padding: 11px 13px; font-size: 14.5px; outline: none;
+    transition: border .2s;
+  }
+  input:focus, select:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,58,237,.18); }
+
+  #picker { position: relative; display: none; margin-top: 16px; }
+  #picker canvas { width: 100%; border-radius: 14px; cursor: crosshair; display: block; }
+  #picker .badge {
+    position: absolute; top: 12px; left: 12px; background: rgba(8,8,13,.8);
+    backdrop-filter: blur(6px); border: 1px solid var(--edge2); border-radius: 9px;
+    padding: 7px 12px; font-size: 12.5px; color: var(--lime); font-weight: 600;
+  }
+
+  /* pipeline stepper */
+  .stages { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stage {
+    flex: 1; min-width: 110px; text-align: center; padding: 12px 6px;
+    border-radius: 10px; background: #0c0c14; border: 1px solid var(--edge2);
+    font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--dim);
+    text-transform: uppercase; transition: all .3s;
+  }
+  .stage.live {
+    color: #fff; border-color: var(--violet);
+    box-shadow: var(--glow); animation: pulse 1.4s ease-in-out infinite;
+  }
+  .stage.ok { color: var(--lime); border-color: rgba(200,255,61,.4); animation: none; }
+  @keyframes pulse { 50% { box-shadow: 0 0 6px rgba(124,58,237,.25); } }
+  #log {
+    font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px;
+    color: #9fdf9f; white-space: pre-wrap; background: #0a0f0a;
+    border: 1px solid #1c2a1c; border-radius: 10px; padding: 12px; min-height: 44px;
+  }
+  .eta { color: var(--dim); font-size: 12.5px; margin-top: 10px; }
+
+  /* ------- cinematic results ------- */
+  #step5 { padding: 0; overflow: hidden; border-color: rgba(124,58,237,.5); }
+  #step5.active { box-shadow: var(--glow); }
+  .results-head {
+    padding: 30px 30px 8px; text-align: center;
+  }
+  .results-head .kicker {
+    color: var(--lime); font-size: 12px; font-weight: 800; letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .results-head h2 {
+    margin: 8px 0 4px; font-size: 34px; font-weight: 800; letter-spacing: -1px; display: block;
+  }
+  .results-head h2 span { color: var(--violet-hot); }
+  .statrow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 14px 0 4px; }
+  .chip {
+    background: rgba(124,58,237,.12); border: 1px solid rgba(124,58,237,.35);
+    color: #d9c9ff; border-radius: 999px; padding: 7px 14px; font-size: 12.5px;
+    font-weight: 700; letter-spacing: .5px;
+  }
+  .chip b { color: var(--lime); }
+  .hero { padding: 18px 30px 6px; }
+  .hero video {
+    box-shadow: 0 10px 60px rgba(124,58,237,.35), 0 2px 16px rgba(0,0,0,.6);
+    border: 1px solid rgba(124,58,237,.4);
+  }
+  .hero .cap { text-align: center; color: var(--dim); font-size: 13px; margin: 12px 0 0; }
+  .section-label {
+    padding: 26px 30px 12px; font-size: 13px; font-weight: 800;
+    letter-spacing: 3px; color: var(--dim); text-transform: uppercase;
+  }
+  .clipgrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px; padding: 0 30px;
+  }
+  .clipcard {
+    background: #0c0c14; border: 1px solid var(--edge2); border-radius: 14px;
+    overflow: hidden; transition: all .25s ease; position: relative;
+  }
+  .clipcard:hover { transform: translateY(-3px); border-color: var(--violet); box-shadow: var(--glow); }
+  .clipcard .goalbadge {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    background: var(--lime); color: #111; font-weight: 800; font-size: 11px;
+    letter-spacing: 1.5px; border-radius: 999px; padding: 5px 11px;
+  }
+  .clipcard video { border-radius: 0; }
+  .clipcard .meta { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; }
+  .clipcard .meta .t { font-weight: 700; font-size: 13.5px; }
+  .clipcard .meta a { color: var(--violet-hot); font-size: 14px; text-decoration: none; margin-left: 10px; }
+  .clipcard .meta a:hover { color: var(--lime); }
+  .ghostbtn {
+    background: #1a1a26; color: var(--dim); border: 1px solid var(--edge2);
+    border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 700;
+    letter-spacing: .5px; box-shadow: none;
+  }
+  .ghostbtn:hover:not(:disabled) { transform: none; color: var(--text); border-color: var(--violet); box-shadow: none; }
+  .ghostbtn.on { color: var(--lime); border-color: rgba(200,255,61,.5); background: rgba(200,255,61,.08); }
+  .fullwrap { padding: 0 30px 30px; }
+  details.full summary {
+    cursor: pointer; color: var(--dim); font-size: 13.5px; padding: 10px 0 16px;
+    list-style: none;
+  }
+  details.full summary:hover { color: var(--text); }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+
+  .footer { text-align: center; color: #55556a; font-size: 12px; margin-top: 40px; }
+  .footer b { color: var(--violet-hot); }
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="wrap">
+  <header><div class="logo">reelcut</div><div class="tag">every game, their highlights</div></header>
+  <p class="sub">Prop up the phone. Film the game. <b>reelcut finds your kid and cuts the goals.</b></p>
+
+  <div class="card active" id="step1">
+    <h2><span class="step-chip">1</span>Drop the game in</h2>
+    <div id="drop">
+      <span class="ball">⚽</span>
+      <div class="big">Drag the game video here</div>
+      <div class="small">or click to choose — MP4 / MOV straight off the phone</div>
+    </div>
+    <input type="file" id="file" accept="video/mp4,video/quicktime">
+    <div class="bar" id="upbar"><i></i></div>
+    <div class="hint" id="uploadHint"></div>
+  </div>
+
+  <div class="card" id="step2">
+    <h2><span class="step-chip">2</span>Find a moment where your kid is easy to see</h2>
+    <video id="player" controls playsinline></video>
+    <div class="row">
+      <button id="pickBtn">📍 Use this moment — find players</button>
+      <span class="hint" id="pickHint" style="margin-top:0"></span>
+    </div>
+    <div id="picker"><canvas id="canvas"></canvas><div class="badge" id="pickBadge"></div></div>
+  </div>
+
+  <div class="card" id="step3">
+    <h2><span class="step-chip">3</span>Who are we starring?</h2>
+    <div class="row">
+      <input id="jersey" placeholder="Jersey #" size="8" inputmode="numeric">
+      <select id="color">
+        <option value="">Kit color…</option>
+        <option>red</option><option>orange</option><option>yellow</option><option>green</option>
+        <option>blue</option><option>purple</option><option>pink</option><option>white</option><option>black</option>
+      </select>
+      <select id="maxclips">
+        <option value="2" selected>Top 2 goal moments</option>
+        <option value="1">Best goal only</option>
+        <option value="3">Top 3 goal moments</option>
+        <option value="0">Every goal moment</option>
+      </select>
+      <button id="goBtn" class="mega" disabled>⚡ Cut the reel</button>
+    </div>
+    <div class="hint">Click your kid in step 2 first — their box turns violet.</div>
+  </div>
+
+  <div class="card" id="step4">
+    <h2><span class="step-chip">4</span>Cutting…</h2>
+    <div class="stages">
+      <div class="stage" data-k="stage1">Tracking</div>
+      <div class="stage" data-k="numbers">Reading #s</div>
+      <div class="stage" data-k="identity">Finding kid</div>
+      <div class="stage" data-k="stage3">Scoring</div>
+      <div class="stage" data-k="stage4">Cutting</div>
+    </div>
+    <div id="log">warming up…</div>
+    <div class="eta" id="eta"></div>
+  </div>
+
+  <div class="card" id="step5">
+    <div class="results-head">
+      <div class="kicker">Matchday cut</div>
+      <h2>Player <span id="rJersey">#7</span>'s highlights</h2>
+      <div class="statrow" id="stats"></div>
+    </div>
+    <div class="hero">
+      <video id="reel" controls playsinline muted autoplay loop></video>
+      <p class="cap">The reel — every kept goal moment, back to back. Unmute for the crowd. 🔊</p>
+    </div>
+    <div class="section-label">Goal moments</div>
+    <div class="clipgrid" id="clips" style="padding-bottom:30px"></div>
+  </div>
+
+  <div class="footer">built on <b>Roboflow</b> · rf-detr + BoT-SORT + your own trained models</div>
+</div>
+
+<script>
+let videoId = null, boxes = [], chosen = -1, seedT = 0, frameW = 0, frameH = 0, t0 = 0;
+const $ = (id) => document.getElementById(id);
+const activate = (id) => $(id).classList.add('active');
+const finish = (id) => $(id).classList.add('done');
+
+/* ---------- upload ---------- */
+const drop = $('drop'), fileInput = $('file');
+drop.onclick = () => fileInput.click();
+['dragover', 'dragenter'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => { if (ev.dataTransfer.files[0]) upload(ev.dataTransfer.files[0]); });
+fileInput.onchange = () => { if (fileInput.files[0]) upload(fileInput.files[0]); };
+
+function upload(f) {
+  const xhr = new XMLHttpRequest();
+  const form = new FormData(); form.append('file', f);
+  $('upbar').style.display = 'block';
+  $('uploadHint').textContent = 'Uploading ' + f.name + '…';
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) $('upbar').firstElementChild.style.width = (100 * e.loaded / e.total) + '%'; };
+  xhr.onload = () => {
+    if (xhr.status !== 200) { $('uploadHint').textContent = '⚠️ Upload failed: ' + xhr.responseText; return; }
+    const r = JSON.parse(xhr.responseText);
+    videoId = r.video_id;
+    $('player').src = r.url;
+    $('uploadHint').textContent = '✓ In. ' + r.duration_s.toFixed(0) + 's of game loaded below.';
+    finish('step1'); activate('step2');
+    $('step2').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  xhr.open('POST', '/api/videos'); xhr.send(form);
+}
+
+/* ---------- frame picker ---------- */
+$('pickBtn').onclick = async () => {
+  const v = $('player'); v.pause();
+  seedT = v.currentTime;
+  $('pickHint').textContent = 'Scanning the frame… (first scan loads the model, ~20s)';
+  let r;
+  try { r = await fetch(`/api/videos/${videoId}/detections?t=${seedT}`); } catch { r = null; }
+  if (!r || !r.ok) { $('pickHint').textContent = '⚠️ Detection failed — try another moment.'; return; }
+  const d = await r.json();
+  boxes = d.players; frameW = d.frame_w; frameH = d.frame_h; chosen = -1;
+  $('pickBadge').textContent = boxes.length ? `${boxes.length} players spotted — click your kid` : 'nobody found — scrub somewhere clearer';
+  $('pickHint').textContent = '';
+  const img = new Image();
+  img.src = `/api/videos/${videoId}/frame.jpg?t=${seedT}`;
+  img.onload = () => { $('picker').style.display = 'block'; draw(img); activate('step3'); };
+};
+
+function draw(img) {
+  const c = $('canvas'); c.width = frameW; c.height = frameH;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, frameW, frameH);
+  boxes.forEach((b, i) => {
+    const sel = i === chosen;
+    ctx.lineWidth = sel ? 7 : 3;
+    ctx.strokeStyle = sel ? '#7C3AED' : 'rgba(255,255,255,.85)';
+    if (sel) { ctx.shadowColor = '#7C3AED'; ctx.shadowBlur = 26; }
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.shadowBlur = 0;
+  });
+  c.onclick = (e) => {
+    const r = c.getBoundingClientRect();
+    const x = (e.clientX - r.left) * frameW / r.width;
+    const y = (e.clientY - r.top) * frameH / r.height;
+    let best = -1, bestArea = 1e18;
+    boxes.forEach((b, i) => {
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h && b.w * b.h < bestArea) { best = i; bestArea = b.w * b.h; }
+    });
+    if (best >= 0) {
+      chosen = best; draw(img); $('goBtn').disabled = false;
+      $('pickBadge').textContent = '✓ starred — fill in step 3';
+      finish('step2');
+    }
+  };
+}
+
+/* ---------- job ---------- */
+$('goBtn').onclick = async () => {
+  if (chosen < 0 || !$('jersey').value.trim() || !$('color').value) {
+    $('pickHint').textContent = '⚠️ Need the kid picked, their jersey number, and kit color.'; return;
+  }
+  const b = boxes[chosen];
+  const form = new FormData();
+  form.append('video_id', videoId);
+  form.append('jersey', $('jersey').value.trim());
+  form.append('team_color', $('color').value);
+  form.append('seed_t', seedT);
+  form.append('seed_x', b.x); form.append('seed_y', b.y);
+  form.append('seed_w', b.w); form.append('seed_h', b.h);
+  form.append('max_goal_clips', $('maxclips').value);
+  const r = await fetch('/api/jobs', { method: 'POST', body: form });
+  if (!r.ok) { alert('Could not start: ' + await r.text()); return; }
+  const { job_id } = await r.json();
+  finish('step3'); activate('step4'); $('goBtn').disabled = true;
+  t0 = Date.now();
+  $('step4').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  poll(job_id);
+};
+
+const stageOf = (ln) =>
+  ln.includes('stage1') ? 'stage1' :
+  ln.includes('numbers') ? 'numbers' :
+  ln.includes('identity') || ln.includes('reid') ? 'identity' :
+  ln.includes('stage3') ? 'stage3' :
+  ln.includes('stage4') ? 'stage4' : null;
+
+function paintStages(lines) {
+  const seen = new Set(lines.map(stageOf).filter(Boolean));
+  const order = ['stage1', 'numbers', 'identity', 'stage3', 'stage4'];
+  let liveSet = false;
+  order.forEach((k) => {
+    const el = document.querySelector(`.stage[data-k="${k}"]`);
+    el.classList.remove('live', 'ok');
+    if (seen.has(k)) el.classList.add('ok');
+    else if (!liveSet) { el.classList.add('live'); liveSet = true; }
+  });
+}
+
+async function poll(jobId) {
+  let s;
+  try { s = await (await fetch(`/api/jobs/${jobId}`)).json(); } catch { return setTimeout(() => poll(jobId), 4000); }
+  const lines = s.log || [];
+  $('log').textContent = lines.join('\n') || 'crunching frames — stage lines land as they finish…';
+  paintStages(lines);
+  $('eta').textContent = `elapsed ${Math.round((Date.now() - t0) / 1000)}s · a 1-min clip ≈ 15 min, full games take a while — leave the tab open`;
+  if (s.state === 'done') {
+    document.querySelectorAll('.stage').forEach(el => { el.classList.remove('live'); el.classList.add('ok'); });
+    finish('step4');
+    reveal(s.results, lines);
+  } else if (s.state === 'failed') {
+    $('log').textContent = lines.join('\n') + '\n\n💥 JOB FAILED — the lines above say where.';
+  } else {
+    setTimeout(() => poll(jobId), 3000);
+  }
+}
+
+/* ---------- cinematic reveal ---------- */
+function statChips(lines) {
+  const chips = [];
+  for (const ln of lines) {
+    let m;
+    if ((m = ln.match(/ball in ([\d.]+)%/))) chips.push(`<span class="chip">BALL TRACKED <b>${m[1]}%</b></span>`);
+    if ((m = ln.match(/(\d+) confirmed \+ (\d+) provisional/))) chips.push(`<span class="chip">NUMBERS READ <b>${m[1]}</b></span>`);
+    if ((m = ln.match(/coverage (\d+)%/))) chips.push(`<span class="chip">KID ON SCREEN <b>${m[1]}%</b></span>`);
+    if ((m = ln.match(/(\d+) clips, ([\d.]+)s total/))) chips.push(`<span class="chip">REEL <b>${m[1]} clips · ${Math.round(m[2])}s</b></span>`);
+  }
+  return chips.join('');
+}
+
+function reveal(res, lines) {
+  $('rJersey').textContent = '#' + ($('jersey').value.trim() || '?');
+  $('stats').innerHTML = statChips(lines);
+  $('reel').src = res.highlights;
+  $('clips').innerHTML = '';
+  const cleanClips = res.clips.filter(u => !u.includes('_annotated'));
+  cleanClips.forEach((clean, i) => {
+    const annotated = res.clips.find(
+      u => u.includes('_annotated') && u.replace('_annotated', '') === clean
+    );
+    const label = (clean.match(/clip\d+_(\d+s-\d+s)/) || [,''])[1].replace('-', ' → ');
+    const d = document.createElement('div');
+    d.className = 'clipcard';
+    d.innerHTML = `<span class="goalbadge">⚽ GOAL MOMENT ${i + 1}</span>
+      <video muted playsinline preload="metadata" src="${clean}"></video>
+      <div class="meta"><span class="t">${label}</span>
+      <span>${annotated ? '<button class="ovl ghostbtn">tracking overlay: OFF</button>' : ''}
+      <a href="${clean}" download>⭳</a></span></div>`;
+    const v = d.querySelector('video');
+    d.onmouseenter = () => v.play();
+    d.onmouseleave = () => { v.pause(); v.currentTime = 0; };
+    v.onclick = () => { v.controls = true; v.muted = false; };
+    const btn = d.querySelector('.ovl');
+    if (btn) btn.onclick = () => {
+      const on = v.src.includes('_annotated');
+      const t = v.currentTime;
+      v.src = on ? clean : annotated;
+      v.currentTime = t; v.play();
+      btn.textContent = 'tracking overlay: ' + (on ? 'OFF' : 'ON');
+      btn.classList.toggle('on', !on);
+      d.querySelector('a').href = on ? clean : annotated;
+    };
+    $('clips').appendChild(d);
+  });
+  activate('step5');
+  $('step5').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  confetti();
+}
+
+/* ---------- confetti ---------- */
+function confetti() {
+  const c = $('confetti'), ctx = c.getContext('2d');
+  c.width = innerWidth; c.height = innerHeight;
+  const colors = ['#7C3AED', '#9F67FF', '#C8FF3D', '#ffffff'];
+  const parts = Array.from({ length: 140 }, () => ({
+    x: Math.random() * c.width, y: -20 - Math.random() * c.height * .5,
+    r: 3 + Math.random() * 5, vy: 2 + Math.random() * 3.5,
+    vx: -1.5 + Math.random() * 3, rot: Math.random() * Math.PI,
+    vr: -.1 + Math.random() * .2, col: colors[(Math.random() * colors.length) | 0],
+  }));
+  let frames = 0;
+  (function tick() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    parts.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.col; ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+      ctx.restore();
+    });
+    if (++frames < 260) requestAnimationFrame(tick);
+    else ctx.clearRect(0, 0, c.width, c.height);
+  })();
+}
+</script>
+</body>
+</html>
