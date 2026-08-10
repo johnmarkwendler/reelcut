@@ -57,12 +57,12 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Cut a one-kid highlight reel from a full game video.",
     )
     parser.add_argument("--video", type=Path, required=True, help="source game video")
-    parser.add_argument("--jersey", required=True, help="target jersey number, e.g. 10")
+    parser.add_argument("--jersey", required=True, help="target cap number, e.g. 10")
     parser.add_argument(
         "--team-color",
         required=True,
         choices=sorted(TEAM_COLORS),
-        help="target kit color",
+        help="target cap color",
     )
     parser.add_argument(
         "--target-frame", type=int, required=True,
@@ -107,7 +107,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seed", type=int, default=None, help="determinism seed")
     parser.add_argument(
-        "--sport", default="soccer", metavar="NAME", help="sport preset"
+        "--sport", default="water-polo", metavar="NAME", help="sport preset"
     )
     parser.add_argument(
         "--max-goal-clips", type=int, default=None, metavar="N",

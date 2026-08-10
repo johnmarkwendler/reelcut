@@ -227,7 +227,7 @@
   <div class="card" id="step3">
     <h2><span class="step-chip">3</span>Who are we starring?</h2>
     <div class="row">
-      <input id="jersey" placeholder="Jersey #" size="8" inputmode="numeric">
+      <input id="jersey" placeholder="Cap #" size="8" inputmode="numeric">
       <select id="color">
         <option value="">Kit color…</option>
         <option>red</option><option>orange</option><option>yellow</option><option>green</option>
@@ -354,7 +354,7 @@ function draw(img) {
 /* ---------- job ---------- */
 $('goBtn').onclick = async () => {
   if (chosen < 0 || !$('jersey').value.trim() || !$('color').value) {
-    $('pickHint').textContent = '⚠️ Need the kid picked, their jersey number, and kit color.'; return;
+    $('pickHint').textContent = '⚠️ Need the player picked, their cap number, and cap color.'; return;
   }
   const b = boxes[chosen];
   const form = new FormData();

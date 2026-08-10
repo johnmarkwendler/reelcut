@@ -29,7 +29,7 @@ TEAM_COLORS: dict[str, list[tuple[int, int, int, int]]] = {
 class SportConfig:
     """Sport-dependent scoring constants (soccer defaults)."""
 
-    name: str = "soccer"
+    name: str = "water-polo"
     # Involvement scoring: distances in units of target player-height
     ball_near_dist: float = 1.5          # full proximity weight inside this
     ball_far_dist: float = 4.0           # zero proximity weight beyond this
@@ -58,16 +58,18 @@ class ReelcutConfig:
     seed: int = 1337
 
     # workflow / inference
-    workspace: str = "water-polo-tracking"       # URL slug of the saved workflow
+    workspace: str = "water-polo-tracking"
     workflow_id: str = "reelcut-tracking"       # URL slug of the saved workflow
-    model_id: str = "ia-foot-8ecu7/1"  # RF-DETR-small on IA Foot (mAP50 90.1)
+    model_id: str = "water-polo-tracking/waterpolo-player-detection-5-rfdetr-medium-t1"
     api_url: str | None = None                  # None = in-process; else inference server URL
-    player_classes: tuple[str, ...] = ("player", "goalkeeper", "goalie")
+    # The live model emits `goalie`; retain `goalkeeper` as a harmless input
+    # alias for cached/upstream observations and defensive parsing.
+    player_classes: tuple[str, ...] = ("player", "goalie", "goalkeeper")
     referee_classes: tuple[str, ...] = ("referee", "ref")
     ball_classes: tuple[str, ...] = ("ball",)
     min_player_box_h_frac: float = 0.02         # drop boxes shorter than 2% of frame height
 
-    # stage 1.5: jersey-number binding — read-until-bound, then the tracker
+    # stage 1.5: cap-number binding — read-until-bound, then the tracker
     # carries the number; a dead track's successor repeats the process.
     digit_model_id: str = "jersey-number-detection-8a55j-ob8fb/1"
     number_attempt_hz: float = 1.0      # attempts per second of unbound track life
@@ -174,7 +176,10 @@ class ReelcutConfig:
     sport: SportConfig = field(default_factory=SportConfig)
 
     def for_sport(self, name: str) -> "ReelcutConfig":
-        presets = {"soccer": SportConfig()}
+        # Start from the upstream scoring constants until a representative
+        # water-polo clip is calibrated. Keeping this as an explicit preset
+        # prevents the CLI from silently selecting soccer behavior.
+        presets = {"water-polo": SportConfig()}
         if name not in presets:
             raise ValueError(f"unknown sport {name!r}; have {sorted(presets)}")
         return replace(self, sport=presets[name])
