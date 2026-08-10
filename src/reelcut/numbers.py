@@ -29,7 +29,7 @@ from .types import FrameObservation, OcrRead
 Reader = Callable[[np.ndarray], "tuple[str, float] | None"]
 
 _CROP_MARGIN = 0.10   # widen player boxes slightly so numbers at the edge survive
-_TORSO_FRAC = 1.0     # digits below this fraction of the crop are not a jersey
+_CAP_Y_FRAC = 0.45    # cap numbers must be in the upper portion of a player crop
 
 
 def assemble_number(
@@ -82,12 +82,10 @@ def make_digit_reader(
             return None
         r = model.infer(crop, confidence=min_conf)
         preds = r[0].predictions if isinstance(r, list) else r.predictions
-        # Jersey numbers live on the TORSO — the upper part of a player crop.
-        # Digits lower than that are somebody else's: broadcast scoreboard
-        # overlays burned into the frame bottom (measured: a kid in front of
-        # the on-screen "2" read as #2 thirty-one times), pitch markings,
-        # sock numbers.
-        max_y = _TORSO_FRAC * crop.shape[0]
+        # Water-polo numbers live on the cap, near the head. Restricting reads
+        # to the upper part of the tracked player crop rejects scoreboard
+        # digits, lane/deck markings, and digits on overlapping players.
+        max_y = _CAP_Y_FRAC * crop.shape[0]
         digits = [
             (float(p.x), float(p.width), str(p.class_name), float(p.confidence))
             for p in preds

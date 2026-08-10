@@ -65,20 +65,20 @@ _ZERO_HIST: tuple[float, ...] = tuple(0.0 for _ in range(HIST_H_BINS * HIST_S_BI
 
 
 def torso_histogram(frame_bgr: np.ndarray, bbox_xywh: tuple[float, float, float, float]) -> tuple[float, ...]:
-    """HSV histogram of the upper-torso region of a player bbox.
+    """HSV histogram of the cap/head region of a water-polo player bbox.
 
-    Torso region: central 60% width, rows 15%..50% of bbox height (skips head
-    and legs). Returns the flattened normalized histogram; all-zeros if the
-    region is degenerate/out of frame.
+    The function name is retained for cache/test compatibility. The sampled
+    region is the central 70% width and top 30% of the box, where cap color is
+    most likely to appear. Returns all-zeros for a degenerate/out-of-frame crop.
     """
     if frame_bgr is None or frame_bgr.size == 0:
         return _ZERO_HIST
     frame_h, frame_w = frame_bgr.shape[:2]
     x, y, w, h = bbox_xywh
-    x0 = max(int(round(x + 0.20 * w)), 0)
-    x1 = min(int(round(x + 0.80 * w)), frame_w)
-    y0 = max(int(round(y + 0.15 * h)), 0)
-    y1 = min(int(round(y + 0.50 * h)), frame_h)
+    x0 = max(int(round(x + 0.15 * w)), 0)
+    x1 = min(int(round(x + 0.85 * w)), frame_w)
+    y0 = max(int(round(y)), 0)
+    y1 = min(int(round(y + 0.30 * h)), frame_h)
     if x1 <= x0 or y1 <= y0:
         return _ZERO_HIST
     hsv = cv2.cvtColor(frame_bgr[y0:y1, x0:x1], cv2.COLOR_BGR2HSV)

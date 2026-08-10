@@ -1,4 +1,10 @@
-# reelcut
+# Water Polo Reelcut
+
+> This branch adapts the original Reelcut soccer prototype to JM's water-polo
+> Roboflow workspace and model. Start with [AGENTS.md](AGENTS.md) for the fixed
+> project configuration and [WATER_POLO_ADAPTATION.md](WATER_POLO_ADAPTATION.md)
+> for the live-validation checklist. The upstream architecture and detailed
+> implementation notes remain below.
 
 **Every game, their highlights.** Parents film entire kids' soccer games and the
 footage dies on their phone. reelcut fixes that: prop the phone up, upload the

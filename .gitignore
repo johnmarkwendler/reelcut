@@ -1,0 +1,12 @@
+.env
+output/
+data/fixtures/*.mp4
+data/fixtures/*.mov
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+.DS_Store
+data/fixtures/*.webm

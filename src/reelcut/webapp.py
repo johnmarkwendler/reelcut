@@ -81,8 +81,13 @@ def _video_path(video_id: str) -> Path:
 def _probe(path: Path) -> tuple[float, float]:
     cap = cv2.VideoCapture(str(path))
     try:
+        if not cap.isOpened():
+            return 0.0, 0.0
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            return 0.0, 0.0
         return (n / fps if fps else 0.0), fps
     finally:
         cap.release()
@@ -140,29 +145,17 @@ def detections(video_id: str, t: float = 0.0) -> dict:
     img = _read_frame(_video_path(video_id), t)
     model = _get_detector()
     r = model.infer(img, confidence=0.4)
-    
-    # Navigate Roboflow Workflow nested structure
-    if isinstance(r, list) and len(r) > 0 and isinstance(r[0], dict) and "tracked_players" in r[0]:
-        preds = r[0]["tracked_players"].get("predictions", [])
-    elif isinstance(r, list) and len(r) > 0:
-        preds = r[0].predictions if hasattr(r[0], 'predictions') else []
-    elif hasattr(r, 'predictions'):
-        preds = r.predictions
-    else:
-        preds = []
-
+    preds = r[0].predictions if isinstance(r, list) else r.predictions
     player_classes = {c.lower() for c in _cfg.player_classes}
-    players = []
-    for p in preds:
-        p_class = getattr(p, "class_name", None) or p.get("class_name")
-        if p_class and str(p_class).lower() in player_classes:
-            players.append({
-                "x": float(getattr(p, "x", p.get("x")) - getattr(p, "width", p.get("width")) / 2),
-                "y": float(getattr(p, "y", p.get("y")) - getattr(p, "height", p.get("height")) / 2),
-                "w": float(getattr(p, "width", p.get("width"))),
-                "h": float(getattr(p, "height", p.get("height"))),
-                "conf": float(getattr(p, "confidence", p.get("confidence"))),
-            })
+    players = [
+        {
+            "x": float(p.x - p.width / 2), "y": float(p.y - p.height / 2),
+            "w": float(p.width), "h": float(p.height),
+            "conf": float(p.confidence),
+        }
+        for p in preds
+        if str(p.class_name).lower() in player_classes
+    ]
     h, w = img.shape[:2]
     return {"frame_w": w, "frame_h": h, "players": players}
 
